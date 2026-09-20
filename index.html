@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#101114"><title>Montage Son</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#101114;color:#f7f7f8;font-family:system-ui,-apple-system,sans-serif;overscroll-behavior:none}button{font:inherit;color:inherit;border:0;touch-action:manipulation}.app{max-width:720px;margin:auto;min-height:100dvh;padding:env(safe-area-inset-top) 14px calc(112px + env(safe-area-inset-bottom))}
+header{height:62px;display:flex;align-items:center;justify-content:space-between}.brand{font-weight:800;font-size:20px}.pill{background:#24262b;border-radius:18px;padding:9px 13px;font-weight:700}.time{text-align:center;font-variant-numeric:tabular-nums;font-size:28px;font-weight:750;margin:4px 0 12px}.timeline{position:relative;background:#17191e;border-radius:18px;padding:14px 10px;overflow:hidden;min-height:300px}.ruler{height:26px;color:#8f949f;font-size:11px;display:flex;justify-content:space-between;border-bottom:1px solid #30333a}.playhead{position:absolute;left:38%;top:8px;bottom:8px;width:2px;background:#fff;z-index:5;pointer-events:none}.playhead:before{content:"";position:absolute;top:0;left:-5px;border:6px solid transparent;border-top-color:#fff}.track{margin-top:13px}.trackhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;font-size:13px;font-weight:750}.wave{height:64px;border-radius:12px;position:relative;overflow:hidden;background:#262930}.clip{height:100%;border-radius:12px;background:linear-gradient(135deg,#7658ff,#9d88ff);display:flex;align-items:center;padding:0 12px;font-weight:800;min-width:80px}.clip.sound{background:linear-gradient(135deg,#17a87b,#35d29e);width:48%;margin-left:22%}.wavebars{opacity:.5;letter-spacing:1px;white-space:nowrap;overflow:hidden;font-size:22px}.add{width:100%;height:58px;margin-top:14px;border:1px dashed #51545e;background:transparent;border-radius:14px;font-weight:800;color:#cfd2da}.hint{text-align:center;color:#9297a2;font-size:13px;margin:13px 0 0}
+.tools{position:fixed;left:0;right:0;bottom:0;background:rgba(20,21,25,.96);backdrop-filter:blur(16px);border-top:1px solid #303239;padding:9px 12px calc(10px + env(safe-area-inset-bottom));z-index:10}.toolsin{max-width:720px;margin:auto;display:grid;grid-template-columns:1fr 1.15fr 1fr;align-items:center;gap:12px}.transport{height:58px;border-radius:18px;background:#292c32;font-size:24px;font-weight:800}.record{height:72px;border-radius:24px;background:#ff3b4f;font-size:17px;font-weight:900;box-shadow:0 6px 24px #ff3b4f33}.record span{display:block;font-size:24px}.secondary{display:flex;gap:8px;margin:12px 0}.secondary button{flex:1;min-height:48px;border-radius:14px;background:#24262b;font-size:13px;font-weight:750}.toast{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:125px;background:#fff;color:#111;padding:10px 16px;border-radius:20px;z-index:30;font-weight:700}.rec .timeline{opacity:.35}.rec .secondary,.rec .add{pointer-events:none}.rec .record{background:#fff;color:#111}.empty{color:#a7abb4;text-align:center;padding:22px 8px;font-size:14px}input{display:none}@media(min-width:700px){.app{padding-left:22px;padding-right:22px}}
+</style></head>
+<body><main class="app" id="app">
+<header><div class="brand">Montage Son</div><button class="pill" id="export">Exporter</button></header>
+<div class="time" id="clock">00:00.0</div>
+<div class="secondary"><button id="undo">↶ Annuler</button><button id="zoomout">− Zoom</button><button id="zoomin">＋ Zoom</button></div>
+<section class="timeline"><div class="playhead"></div><div class="ruler"><span>0:00</span><span>0:15</span><span>0:30</span><span>0:45</span><span>1:00</span></div>
+<div class="track"><div class="trackhead"><span>🎙️ VOIX</span><span>100% 🔊</span></div><div class="wave" id="voice"><div class="empty">Ta voix apparaîtra ici</div></div></div>
+<div class="track"><div class="trackhead"><span>🎵 SONS</span><span>100% 🔊</span></div><div class="wave" id="sounds"><div class="empty">Ajoute musique ou bruitage</div></div></div>
+<button class="add" id="add">＋ Ajouter un son</button><input type="file" id="file" accept="audio/*">
+<div class="hint">Écoute au casque • les enregistrements restent sur ton appareil</div></section>
+</main>
+<div class="toast" id="toast"></div>
+<nav class="tools"><div class="toolsin"><button class="transport" id="back">↶ 5s</button><button class="record" id="record"><span>●</span>ENREGISTRER</button><button class="transport" id="play">▶</button></div></nav>
+<script>
+const $=s=>document.querySelector(s),app=$('#app'),clock=$('#clock'),recBtn=$('#record'),playBtn=$('#play'),toast=$('#toast');
+let recorder,chunks=[],recording=false,start=0,timer,audios=[],lastVoice=null;
+function msg(s){toast.textContent=s;toast.style.display='block';setTimeout(()=>toast.style.display='none',1800)}
+function fmt(ms){let s=ms/1000;return String(Math.floor(s/60)).padStart(2,'0')+':'+(s%60).toFixed(1).padStart(4,'0')}
+async function record(){
+ if(recording){recorder.stop();return}
+ try{
+  const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+  chunks=[];recorder=new MediaRecorder(stream);recorder.ondataavailable=e=>chunks.push(e.data);
+  recorder.onstop=()=>{stream.getTracks().forEach(t=>t.stop());const blob=new Blob(chunks,{type:recorder.mimeType});lastVoice=URL.createObjectURL(blob);showVoice(lastVoice);recording=false;app.classList.remove('rec');recBtn.innerHTML='<span>●</span>ENREGISTRER';clearInterval(timer);msg('Prise enregistrée ✓')};
+  recorder.start();recording=true;start=performance.now();app.classList.add('rec');recBtn.innerHTML='<span>■</span>STOP';timer=setInterval(()=>clock.textContent=fmt(performance.now()-start),100);audios.forEach(a=>{a.currentTime=0;a.play().catch(()=>{})});
+ }catch(e){msg('Autorise le microphone pour enregistrer')}
+}
+function showVoice(url){$('#voice').innerHTML='<div class="clip" style="width:72%"><span class="wavebars">▂▅▇▃▆▂▇▅▃▆▇▂▅▃▇▆▂▅▇▃</span></div>';let a=new Audio(url);a.dataset.kind='voice';audios.unshift(a)}
+recBtn.onclick=record;
+$('#add').onclick=()=>$('#file').click();
+$('#file').onchange=e=>{let f=e.target.files[0];if(!f)return;let url=URL.createObjectURL(f),a=new Audio(url);audios.push(a);$('#sounds').innerHTML='<div class="clip sound"><span>♪ '+f.name.slice(0,18)+'</span></div>';msg('Son ajouté ✓')};
+playBtn.onclick=()=>{if(!audios.length)return msg('Ajoute ou enregistre un son');let any=audios.some(a=>!a.paused);if(any){audios.forEach(a=>a.pause());playBtn.textContent='▶'}else{audios.forEach(a=>a.play().catch(()=>{}));playBtn.textContent='⏸'}};
+$('#back').onclick=()=>audios.forEach(a=>a.currentTime=Math.max(0,a.currentTime-5));
+$('#undo').onclick=()=>{if(lastVoice){audios=audios.filter(a=>a.dataset.kind!=='voice');lastVoice=null;$('#voice').innerHTML='<div class="empty">Ta voix apparaîtra ici</div>';msg('Dernière prise annulée')}};
+$('#zoomin').onclick=()=>msg('Zoom tactile prêt pour la prochaine étape');$('#zoomout').onclick=()=>msg('Zoom tactile prêt pour la prochaine étape');
+$('#export').onclick=()=>msg('Export audio arrive dans la prochaine étape');
+</script></body></html>
